@@ -149,21 +149,17 @@ void setup() {
   // Завантаження налаштувань
   String savedSSID = storage.loadSSID();
   String savedPassword = storage.loadPassword();
- 
   int hour, minute;
   bool enabled;
   storage.loadAlarmSettings(hour, minute, enabled);
   alarmManager.setTime(hour, minute);
   alarmManager.setEnabled(enabled);
- 
   ledMode = storage.loadLEDMode();
- 
   String apiKey = storage.loadWeatherApiKey();
   weatherManager.setApiKey(apiKey);
 
   // Спроба підключення до WiFi
   displayManager.intro(savedSSID);
- 
   if (savedSSID.length() > 0) {
     wifiManager.connectToWiFi(savedSSID, savedPassword);
   }
@@ -172,15 +168,14 @@ void setup() {
   if (!wifiManager.isConnected()) {
     wifiManager.startAP();
     displayManager.displayApMode();
-   
     wifiManager.begin();
-   
+
     // Залишаємось в режимі очікування
     while (!wifiManager.isConnected()) {
       wifiManager.handleClient();
       delay(10);
     }
-   
+
     // Якщо підключились через веб-панель, перезапускаємо
     ESP.restart();
   }
@@ -188,17 +183,27 @@ void setup() {
   // Ініціалізація периферії
   timeClient.begin();
   bmp.begin(0x76);
-
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   pinMode(YELLOW_LED_PIN, OUTPUT);
   pinMode(WHITE_LED_PIN, OUTPUT);
-
   alarmManager.setupI2S();
- 
+
   // Налаштування NTP
   configTime(GMT_OFFSET_SEC, DAYLIGHT_OFFSET_SEC, NTP_SERVER);
-  delay(1000);
- 
+
+  // Очікування синхронізації NTP
+  int syncAttempts = 0;
+  while (!timeClient.update() && syncAttempts < 20) {
+    delay(500);
+    syncAttempts++;
+  }
+
+  // Якщо не вдалося синхронізуватися, спробувати ще раз через forceUpdate
+  if (syncAttempts >= 20) {
+    timeClient.forceUpdate();
+    delay(1000);
+  }
+
   // Перше оновлення погоди
   if (weatherManager.hasApiKey()) {
     weatherManager.fetchWeatherData();
